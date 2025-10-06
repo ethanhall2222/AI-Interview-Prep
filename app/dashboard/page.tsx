@@ -48,8 +48,9 @@ export default async function DashboardPage() {
               <tr>
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3">Role</th>
+                <th className="px-4 py-3">Type</th>
                 <th className="px-4 py-3">Overall</th>
-                <th className="px-4 py-3">Transcript</th>
+                <th className="px-4 py-3">Report</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50 bg-slate-950/20">
@@ -59,7 +60,10 @@ export default async function DashboardPage() {
                     {new Date(session.created_at).toLocaleString()}
                   </td>
                   <td className="px-4 py-3">{session.role}</td>
-                  <td className="px-4 py-3 font-semibold text-indigo-300">
+                  <td className="px-4 py-3 capitalize text-slate-400">
+                    {session.scores.meta?.interviewType ?? "—"}
+                  </td>
+                  <td className="px-4 py-3 font-semibold text-blue-300">
                     {session.scores.scores.overall.toFixed(1)} / 10
                   </td>
                   <td className="px-4 py-3">

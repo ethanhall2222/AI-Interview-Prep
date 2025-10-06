@@ -7,7 +7,7 @@ interface ScoreCardProps {
 }
 
 export function ScoreCard({ evaluation, heading = "Session Feedback" }: ScoreCardProps) {
-  const { scores, feedback, tips_next_time } = evaluation;
+  const { scores, feedback, tips_next_time, meta } = evaluation;
 
   const scoreEntries = [
     { label: "Structure", value: scores.structure },
@@ -24,6 +24,12 @@ export function ScoreCard({ evaluation, heading = "Session Feedback" }: ScoreCar
           <p className="text-sm text-slate-400">
             STAR-aligned coaching powered by OpenAI
           </p>
+          {meta && (
+            <p className="mt-1 text-xs uppercase tracking-wide text-slate-500">
+              {meta.interviewType} interview · {meta.questionCount} question
+              {meta.questionCount === 1 ? "" : "s"}
+            </p>
+          )}
         </div>
         <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/20 px-4 py-2 text-emerald-200">
           <Sparkles className="h-4 w-4" />

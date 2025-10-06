@@ -11,7 +11,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Invalid request payload." }, { status: 400 });
     }
 
-    const questions = await generateQuestions(parsed.data.role);
+    const questions = await generateQuestions({
+      role: parsed.data.role,
+      interviewType: parsed.data.interviewType,
+      count: parsed.data.count,
+    });
     return NextResponse.json(questions);
   } catch (error) {
     const message =

@@ -5,6 +5,7 @@ import {
   EvalRequestPayloadType,
   QuestionResponse,
   QuestionResponseType,
+  interviewTypes,
   roleSchema,
 } from "./schemas";
 import {
@@ -25,67 +26,80 @@ const questionResponseJsonSchema = {
     questions: {
       type: "array",
       items: { type: "string" },
-      minItems: 3,
-      maxItems: 3,
+      minItems: 1,
+      maxItems: 6,
     },
   },
   additionalProperties: false,
 } as const;
 
-const evaluationJsonSchema = {
+const baseEvaluationSchema = {
+  scores: {
+    type: "object",
+    required: ["structure", "relevance", "impact", "delivery", "overall"],
+    properties: {
+      structure: { type: "number" },
+      relevance: { type: "number" },
+      impact: { type: "number" },
+      delivery: { type: "number" },
+      overall: { type: "number" },
+    },
+    additionalProperties: false,
+  },
+  feedback: {
+    type: "object",
+    required: ["summary", "by_answer"],
+    properties: {
+      summary: { type: "string" },
+      by_answer: {
+        type: "array",
+        items: {
+          type: "object",
+          required: ["improvements", "missing_keywords"],
+          properties: {
+            improvements: {
+              type: "array",
+              items: { type: "string" },
+              maxItems: 5,
+            },
+            missing_keywords: {
+              type: "array",
+              items: { type: "string" },
+              maxItems: 8,
+            },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    additionalProperties: false,
+  },
+  tips_next_time: {
+    type: "array",
+    items: { type: "string" },
+    maxItems: 5,
+  },
+} as const;
+
+const evaluationJsonSchema = (count: number) => ({
   type: "object",
   required: ["scores", "feedback", "tips_next_time"],
   properties: {
-    scores: {
-      type: "object",
-      required: ["structure", "relevance", "impact", "delivery", "overall"],
-      properties: {
-        structure: { type: "number" },
-        relevance: { type: "number" },
-        impact: { type: "number" },
-        delivery: { type: "number" },
-        overall: { type: "number" },
-      },
-      additionalProperties: false,
-    },
+    ...baseEvaluationSchema,
     feedback: {
-      type: "object",
-      required: ["summary", "by_answer"],
+      ...baseEvaluationSchema.feedback,
       properties: {
-        summary: { type: "string" },
+        ...baseEvaluationSchema.feedback.properties,
         by_answer: {
-          type: "array",
-          items: {
-            type: "object",
-            required: ["improvements", "missing_keywords"],
-            properties: {
-              improvements: {
-                type: "array",
-                items: { type: "string" },
-                maxItems: 5,
-              },
-              missing_keywords: {
-                type: "array",
-                items: { type: "string" },
-                maxItems: 8,
-              },
-            },
-            additionalProperties: false,
-          },
-          minItems: 3,
-          maxItems: 3,
+          ...baseEvaluationSchema.feedback.properties.by_answer,
+          minItems: count,
+          maxItems: count,
         },
       },
-      additionalProperties: false,
-    },
-    tips_next_time: {
-      type: "array",
-      items: { type: "string" },
-      maxItems: 5,
     },
   },
   additionalProperties: false,
-} as const;
+});
 
 function getClient() {
   if (DEV_MODE) {
@@ -159,24 +173,37 @@ async function parseWithRetry<T>(
   throw error instanceof Error ? error : new Error("Failed to parse OpenAI response");
 }
 
-export async function generateQuestions(role: string): Promise<QuestionResponseType> {
+export async function generateQuestions({
+  role,
+  interviewType,
+  count,
+}: {
+  role: string;
+  interviewType: (typeof interviewTypes)[number];
+  count: number;
+}): Promise<QuestionResponseType> {
   const roleParse = roleSchema.safeParse(role);
 
   if (!roleParse.success) {
     throw new Error("Invalid role supplied.");
   }
 
+  const safeCount = Math.min(Math.max(count, 1), 6);
+
   if (DEV_MODE) {
-    return {
-      questions: [
-        `DEV: Describe a time you created leverage as a ${role}.`,
-        `DEV: Walk through a ${role} project where metrics mattered.`,
-        `DEV: Share how you handled a setback in a ${role} context.`,
-      ],
-    } satisfies QuestionResponseType;
+    const placeholder = new Array(safeCount).fill(null).map((_, idx) => {
+      return `DEV sample question ${idx + 1} (${interviewType}) for ${role}.`;
+    });
+    return { questions: placeholder } satisfies QuestionResponseType;
   }
 
-  const prompt = buildQuestionPrompt(roleParse.data);
+  const seed = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const prompt = buildQuestionPrompt({
+    role: roleParse.data,
+    interviewType,
+    count: safeCount,
+    seed,
+  });
 
   return parseWithRetry(
     (retry) =>
@@ -209,35 +236,35 @@ export async function evaluateSession(
       feedback: {
         summary:
           "Strong structure but outcomes need clearer metrics. Focus on quantifying impact and clarifying your personal contributions.",
-        by_answer: [
-          {
-            improvements: [
-              "Add measurable results to reinforce the outcome.",
-              "Clarify the Action steps you personally drove.",
-            ],
-            missing_keywords: ["metrics", "scalability"],
-          },
-          {
-            improvements: ["Tie the customer need to the business metric."],
-            missing_keywords: ["OKRs"],
-          },
-          {
-            improvements: ["Provide more detail on collaboration tactics."],
-            missing_keywords: [],
-          },
-        ],
+        by_answer: new Array(input.answers.length).fill(null).map(() => ({
+          improvements: [
+            "Lead with the result and quantify the impact.",
+            "Add more detail on your personal actions.",
+          ],
+          missing_keywords: [],
+        })),
       },
       tips_next_time: [
         "Lead with the Result in one sentence before diving into details.",
         "State the metric shift or customer impact for each story.",
         "Highlight one learning per example to show growth mindset.",
       ],
+      meta: {
+        interviewType: input.interviewType,
+        questionCount: input.questions.length,
+      },
     } satisfies EvalPayloadType;
   }
 
-  const prompt = buildFeedbackPrompt(input);
+  const prompt = buildFeedbackPrompt({
+    role: input.role,
+    interviewType: input.interviewType,
+    questions: input.questions,
+    answers: input.answers,
+  });
+  const questionCount = input.questions.length;
 
-  return parseWithRetry(
+  const evaluation = await parseWithRetry(
     (retry) =>
       createJsonResponse(
         FEEDBACK_SYSTEM_PROMPT,
@@ -247,8 +274,16 @@ export async function evaluateSession(
 Return valid JSON only.`
           : prompt,
         "evaluation_response",
-        evaluationJsonSchema,
+        evaluationJsonSchema(questionCount),
       ),
     (payload) => EvalPayload.parse(payload),
   );
+
+  return {
+    ...evaluation,
+    meta: {
+      interviewType: input.interviewType,
+      questionCount,
+    },
+  } satisfies EvalPayloadType;
 }

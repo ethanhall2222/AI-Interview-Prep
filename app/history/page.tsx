@@ -62,6 +62,12 @@ export default async function HistoryPage() {
                 </div>
               </header>
 
+              <p className="mt-1 text-[11px] uppercase tracking-wide text-slate-500">
+                {session.scores.meta?.interviewType ?? "behavioral"} interview ·{" "}
+                {session.question_set.length} question
+                {session.question_set.length === 1 ? "" : "s"}
+              </p>
+
               <div className="mt-4 grid gap-4 text-xs text-slate-400 md:grid-cols-2">
                 <div className="space-y-2">
                   <p className="text-[11px] uppercase tracking-wide text-slate-500">

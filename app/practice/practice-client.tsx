@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -16,33 +16,62 @@ import { Button, buttonStyles } from "@/components/Button";
 import QuestionCard from "@/components/QuestionCard";
 import ScoreCard from "@/components/ScoreCard";
 import { useToast } from "@/components/ToastProvider";
-import type { Role, StoredEvaluationType } from "@/lib/schemas";
+import { interviewTypes } from "@/lib/schemas";
+import type { QuestionResponseType, StoredEvaluationType } from "@/lib/schemas";
+
+type InterviewType = (typeof interviewTypes)[number];
 
 interface PracticeClientProps {
-  roles: Role[];
+  roles: string[];
 }
 
-interface QuestionResponsePayload {
-  questions: string[];
+interface QuestionResponsePayload extends QuestionResponseType {
   message?: string;
 }
 
 export default function PracticeClient({ roles }: PracticeClientProps) {
-  const [selectedRole, setSelectedRole] = useState<Role>(roles[0]);
+  const defaultRole = roles[0] ?? "";
+  const [roleInput, setRoleInput] = useState<string>(defaultRole);
+  const [interviewType, setInterviewType] = useState<InterviewType>(interviewTypes[0]);
+  const [questionCount, setQuestionCount] = useState<number>(3);
   const [questions, setQuestions] = useState<string[]>([]);
-  const [answers, setAnswers] = useState<string[]>(["", "", ""]);
+  const [answers, setAnswers] = useState<string[]>([]);
   const [evaluation, setEvaluation] = useState<StoredEvaluationType | null>(null);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [recordingIndex, setRecordingIndex] = useState<number | null>(null);
   const [transcribingIndex, setTranscribingIndex] = useState<number | null>(null);
   const [recorderSupported, setRecorderSupported] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [reviewMode, setReviewMode] = useState(false);
 
   const mediaRecorderRef = useRef<Record<number, MediaRecorder | null>>({});
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Record<number, BlobPart[]>>({});
 
   const { publish } = useToast();
+
+  const interviewOptions = useMemo(
+    () => [
+      {
+        id: "behavioral" as InterviewType,
+        label: "Behavioral",
+        blurb: "Highlight past actions and leadership moments.",
+      },
+      {
+        id: "situational" as InterviewType,
+        label: "Situational",
+        blurb: "Test judgment on hypothetical but realistic dilemmas.",
+      },
+      {
+        id: "technical" as InterviewType,
+        label: "Technical",
+        blurb: "Dive into architecture, debugging, or analytical thinking.",
+      },
+    ],
+    [],
+  );
+  const selectedOption = interviewOptions.find((option) => option.id === interviewType);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -66,14 +95,27 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
   }, []);
 
   const handleGenerateQuestions = async () => {
+    const normalizedRole = roleInput.trim();
+
+    if (normalizedRole.length < 2) {
+      publish("Enter a role (e.g. Engineering Manager).", "error");
+      return;
+    }
+
     setLoadingQuestions(true);
     setEvaluation(null);
+    setReviewMode(false);
+    setCurrentIndex(0);
 
     try {
       const response = await fetch("/api/questions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: selectedRole }),
+        body: JSON.stringify({
+          role: normalizedRole,
+          interviewType,
+          count: questionCount,
+        }),
       });
 
       const payload = (await response.json()) as QuestionResponsePayload;
@@ -82,8 +124,10 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
         throw new Error(payload.message ?? "Unable to fetch questions.");
       }
 
+      setRoleInput(normalizedRole);
       setQuestions(payload.questions);
-      setAnswers(["", "", ""]);
+      setAnswers(new Array(payload.questions.length).fill(""));
+      setQuestionCount(payload.questions.length);
       publish("Question set ready. Time to craft your STAR answers.", "success");
     } catch (error) {
       publish(
@@ -217,14 +261,49 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
     "Use the transcript to tighten phrasing or add key metrics before submission.",
   ];
 
+  const currentQuestion = questions[currentIndex] ?? "";
+  const currentAnswer = answers[currentIndex] ?? "";
+  const isLastQuestion = currentIndex === questions.length - 1;
+  const canAdvance = currentAnswer.trim().length >= 10;
+  const allAnswered =
+    answers.length === questions.length &&
+    answers.every((answer) => answer.trim().length >= 10);
+
+  const handleAdvance = () => {
+    if (!canAdvance) {
+      publish("Record or type at least a few sentences before continuing.", "error");
+      return;
+    }
+
+    if (isLastQuestion) {
+      setReviewMode(true);
+    } else {
+      setCurrentIndex((prev) => Math.min(prev + 1, questions.length - 1));
+    }
+  };
+
+  const handleBack = () => {
+    if (currentIndex === 0) {
+      return;
+    }
+    setCurrentIndex((prev) => Math.max(prev - 1, 0));
+  };
+
   const handleSubmit = async () => {
-    if (questions.length !== 3) {
+    if (questions.length === 0) {
       publish("Generate questions before requesting feedback.", "error");
       return;
     }
 
+    const normalizedRole = roleInput.trim();
+
+    if (!normalizedRole) {
+      publish("Role cannot be empty.", "error");
+      return;
+    }
+
     if (answers.some((answer) => answer.trim().length < 20)) {
-      publish("Each answer should be at least 20 characters to evaluate.", "error");
+      publish("Each answer should be at least 20 characters before evaluation.", "error");
       return;
     }
 
@@ -235,7 +314,8 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          role: selectedRole,
+          role: normalizedRole,
+          interviewType,
           questions,
           answers,
         }),
@@ -263,7 +343,10 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
 
   const handleReset = () => {
     setEvaluation(null);
-    setAnswers(["", "", ""]);
+    setQuestions([]);
+    setAnswers([]);
+    setCurrentIndex(0);
+    setReviewMode(false);
     publish("Session reset. Draft fresh answers.", "info");
   };
 
@@ -285,17 +368,53 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
           <div className="flex flex-wrap items-center gap-3 text-sm text-slate-200">
             <label className="flex items-center gap-2">
               Role
-              <select
-                value={selectedRole}
-                onChange={(event) => setSelectedRole(event.target.value as Role)}
-                className="rounded-md border border-slate-700/70 bg-slate-950/80 px-3 py-2 text-sm text-white shadow-inner focus:border-indigo-400 focus:outline-none"
-              >
-                {roles.map((role) => (
-                  <option key={role} value={role} className="bg-slate-900 text-white">
-                    {role}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <input
+                  list="role-suggestions"
+                  value={roleInput}
+                  onChange={(event) => setRoleInput(event.target.value)}
+                  placeholder="e.g. Engineering Manager"
+                  className="w-64 rounded-md border border-slate-700/70 bg-slate-950/80 px-3 py-2 text-sm text-white shadow-inner focus:border-blue-400 focus:outline-none"
+                />
+                <datalist id="role-suggestions">
+                  {roles.map((role) => (
+                    <option key={role} value={role} />
+                  ))}
+                </datalist>
+              </div>
+            </label>
+            <div className="flex items-center gap-1 rounded-full border border-slate-700/60 bg-slate-950/60 px-1 py-1 text-xs font-medium text-slate-300">
+              {interviewOptions.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => setInterviewType(option.id)}
+                  className={`rounded-full px-3 py-1 transition ${
+                    interviewType === option.id
+                      ? "bg-blue-500/20 text-blue-200"
+                      : "hover:bg-slate-800/70"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            {selectedOption && (
+              <span className="text-xs text-slate-400">{selectedOption.blurb}</span>
+            )}
+            <label className="flex items-center gap-2">
+              Questions
+              <input
+                type="range"
+                min={1}
+                max={5}
+                value={questionCount}
+                onChange={(event) => setQuestionCount(Number(event.target.value))}
+                className="accent-blue-500"
+              />
+              <span className="w-6 text-right text-xs text-slate-300">
+                {questionCount}
+              </span>
             </label>
             <Button
               type="button"
@@ -337,8 +456,81 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
         <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/60 p-8 text-sm text-slate-300">
           Generate a question set to begin your practice session.
         </div>
+      ) : !reviewMode ? (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>
+              Question {currentIndex + 1} of {questions.length}
+            </span>
+            <span>
+              {Math.round(((currentIndex + 1) / questions.length) * 100)}% complete
+            </span>
+          </div>
+          <div className="space-y-4 rounded-3xl border border-slate-800/50 bg-slate-950/60 p-6">
+            <QuestionCard
+              index={currentIndex}
+              question={currentQuestion}
+              value={currentAnswer}
+              onChange={(value) => handleAnswerChange(currentIndex, value)}
+              disabled={submitting || transcribingIndex === currentIndex}
+            />
+            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
+              <Button
+                type="button"
+                intent="secondary"
+                size="sm"
+                onClick={() => toggleRecording(currentIndex)}
+                disabled={
+                  !recorderSupported || submitting || transcribingIndex === currentIndex
+                }
+              >
+                {recordingIndex === currentIndex ? (
+                  <Square className="h-4 w-4" />
+                ) : (
+                  <Mic className="h-4 w-4" />
+                )}
+                {recordingIndex === currentIndex ? "Stop recording" : "Record answer"}
+              </Button>
+              {transcribingIndex === currentIndex ? (
+                <span className="inline-flex items-center gap-2 text-slate-300">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Transcribing…
+                </span>
+              ) : (
+                <span>
+                  {recorderSupported
+                    ? "Use the microphone, then refine the transcript inline."
+                    : "Voice capture is not supported in this browser."}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center justify-between">
+              <Button
+                type="button"
+                intent="ghost"
+                size="sm"
+                onClick={handleBack}
+                disabled={currentIndex === 0 || submitting}
+              >
+                Previous
+              </Button>
+              <Button
+                type="button"
+                onClick={handleAdvance}
+                disabled={submitting || transcribingIndex === currentIndex}
+              >
+                {isLastQuestion ? "Finish answers" : "Next question"}
+              </Button>
+            </div>
+          </div>
+        </div>
       ) : (
         <div className="space-y-6">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Review &amp; polish your answers before scoring.</span>
+            <Button intent="ghost" size="sm" onClick={() => setReviewMode(false)}>
+              Back to questions
+            </Button>
+          </div>
           {questions.map((question, index) => (
             <div
               key={question}
@@ -351,35 +543,6 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
                 onChange={(value) => handleAnswerChange(index, value)}
                 disabled={submitting || transcribingIndex === index}
               />
-              <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
-                <Button
-                  type="button"
-                  intent="secondary"
-                  size="sm"
-                  onClick={() => toggleRecording(index)}
-                  disabled={
-                    !recorderSupported || submitting || transcribingIndex === index
-                  }
-                >
-                  {recordingIndex === index ? (
-                    <Square className="h-4 w-4" />
-                  ) : (
-                    <Mic className="h-4 w-4" />
-                  )}
-                  {recordingIndex === index ? "Stop recording" : "Record answer"}
-                </Button>
-                {transcribingIndex === index ? (
-                  <span className="inline-flex items-center gap-2 text-slate-300">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Transcribing…
-                  </span>
-                ) : (
-                  <span>
-                    {recorderSupported
-                      ? "Use the microphone, then refine the transcript inline."
-                      : "Voice capture is not supported in this browser."}
-                  </span>
-                )}
-              </div>
             </div>
           ))}
         </div>
@@ -389,20 +552,20 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
         <Button
           type="button"
           onClick={handleSubmit}
-          disabled={submitting || questions.length === 0}
+          disabled={submitting || questions.length === 0 || !reviewMode || !allAnswered}
         >
           {submitting ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <Sparkles className="h-4 w-4" />
           )}
-          Get feedback
+          Request feedback
         </Button>
         <Button
           type="button"
           intent="ghost"
           onClick={handleReset}
-          disabled={questions.length === 0}
+          disabled={questions.length === 0 || submitting}
         >
           Reset session
         </Button>
