@@ -3,6 +3,8 @@ import Link from "next/link";
 import { requireServerSession } from "@/lib/auth-helpers";
 import { SessionRow, type SessionRowType } from "@/lib/schemas";
 
+export const revalidate = 0;
+
 function parseSessions(rows: unknown[]): SessionRowType[] {
   return rows
     .map((row) => SessionRow.safeParse(row))
@@ -30,8 +32,8 @@ export default async function DashboardPage() {
       <header className="space-y-2">
         <h1 className="text-3xl font-semibold text-slate-50">Dashboard</h1>
         <p className="text-sm text-slate-300">
-          Track your recent practice sessions. Each row summarises the overall score and
-          provides a link to dive into the detailed feedback.
+          Track your latest mock interviews at a glance. Drill into any session to review
+          detailed feedback, transcripts, and next steps.
         </p>
       </header>
 
@@ -40,30 +42,30 @@ export default async function DashboardPage() {
           No sessions yet. Run your first practice session to populate this dashboard.
         </p>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-800">
-          <table className="min-w-full divide-y divide-slate-800 text-sm">
+        <div className="overflow-hidden rounded-3xl border border-slate-800/60 bg-slate-950/60">
+          <table className="min-w-full divide-y divide-slate-800/60 text-sm">
             <thead className="bg-slate-900/70 text-left text-xs uppercase tracking-wide text-slate-400">
               <tr>
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3">Role</th>
                 <th className="px-4 py-3">Overall</th>
-                <th className="px-4 py-3">Actions</th>
+                <th className="px-4 py-3">Transcript</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800 bg-slate-950/40">
+            <tbody className="divide-y divide-slate-800/50 bg-slate-950/20">
               {sessions.map((session) => (
                 <tr key={session.id} className="text-slate-200">
                   <td className="px-4 py-3 text-slate-300">
                     {new Date(session.created_at).toLocaleString()}
                   </td>
                   <td className="px-4 py-3">{session.role}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 font-semibold text-indigo-300">
                     {session.scores.scores.overall.toFixed(1)} / 10
                   </td>
                   <td className="px-4 py-3">
                     <Link
                       href={`/dashboard/${session.id}`}
-                      className="text-indigo-300 transition hover:text-indigo-100"
+                      className="rounded-full border border-indigo-500/40 px-3 py-1 text-xs font-medium text-indigo-200 transition hover:bg-indigo-500/10"
                     >
                       View details
                     </Link>

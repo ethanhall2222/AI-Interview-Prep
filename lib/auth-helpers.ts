@@ -6,6 +6,20 @@ import {
   getSupabaseServerComponentClient,
 } from "./supabase-server";
 
+async function ensureProfileRecord(supabase: TypedSupabaseClient, userId: string) {
+  try {
+    const { error } = await supabase
+      .from("profiles")
+      .upsert({ id: userId }, { onConflict: "id" });
+
+    if (error) {
+      console.error("Failed to upsert profile", error.message);
+    }
+  } catch (error) {
+    console.error("Unexpected profile upsert error", error);
+  }
+}
+
 function hasSupabaseEnv() {
   return Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -40,6 +54,8 @@ export async function requireServerSession() {
     redirect("/login");
   }
 
+  await ensureProfileRecord(supabase, session.user.id);
+
   return { session, supabase } as { session: Session; supabase: TypedSupabaseClient };
 }
 
@@ -58,6 +74,10 @@ export async function getOptionalServerSession() {
   const {
     data: { session },
   } = await supabase.auth.getSession();
+
+  if (session) {
+    await ensureProfileRecord(supabase, session.user.id);
+  }
 
   return { session: session ?? null, supabase } as {
     session: Session | null;
@@ -80,6 +100,10 @@ export async function getRouteHandlerSession() {
   const {
     data: { session },
   } = await supabase.auth.getSession();
+
+  if (session) {
+    await ensureProfileRecord(supabase, session.user.id);
+  }
 
   return { session: session ?? null, supabase } as {
     session: Session | null;

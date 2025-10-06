@@ -202,6 +202,13 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
     });
   };
 
+  const microphoneUnavailable = !recorderSupported;
+  const quickTips = [
+    "Aim for 60-90 seconds per answer and keep STAR in mind.",
+    "Lead with the Result, then rewind through Situation → Task → Action.",
+    "Use the transcript to tighten phrasing or add key metrics before submission.",
+  ];
+
   const handleSubmit = async () => {
     if (questions.length !== 3) {
       publish("Generate questions before requesting feedback.", "error");
@@ -254,42 +261,68 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
 
   return (
     <div className="space-y-10">
-      <header className="space-y-4">
-        <h1 className="text-3xl font-semibold text-slate-50">Practice Session</h1>
-        <p className="text-sm text-slate-300">
-          Choose a role, generate three tailored questions, speak your answers out loud,
-          and refine the auto-transcribed notes before submitting. Once you submit, OpenAI
-          will analyse and score you across key interview dimensions.
-        </p>
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2 text-sm text-slate-200">
-            Role
-            <select
-              value={selectedRole}
-              onChange={(event) => setSelectedRole(event.target.value as Role)}
-              className="rounded-md border border-slate-700 bg-slate-950/80 px-3 py-2 text-sm text-white focus:border-indigo-400 focus:outline-none"
+      <header className="grid gap-6 rounded-3xl border border-slate-800/60 bg-slate-900/60 p-6 backdrop-blur md:grid-cols-[1.35fr_1fr]">
+        <div className="space-y-4">
+          <p className="inline-flex items-center gap-2 rounded-full border border-indigo-500/40 bg-indigo-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-indigo-200">
+            <Headphones className="h-3.5 w-3.5" /> Voice-led drills
+          </p>
+          <h1 className="text-3xl font-semibold text-slate-50 sm:text-4xl">
+            Practice Session
+          </h1>
+          <p className="text-sm leading-relaxed text-slate-300">
+            Generate three tailored prompts, speak your answers aloud, let the AI
+            transcribe them, and polish the notes before submitting. We score each
+            response against STAR so you know exactly what to sharpen next.
+          </p>
+          <div className="flex flex-wrap items-center gap-3 text-sm text-slate-200">
+            <label className="flex items-center gap-2">
+              Role
+              <select
+                value={selectedRole}
+                onChange={(event) => setSelectedRole(event.target.value as Role)}
+                className="rounded-md border border-slate-700/70 bg-slate-950/80 px-3 py-2 text-sm text-white shadow-inner focus:border-indigo-400 focus:outline-none"
+              >
+                {roles.map((role) => (
+                  <option key={role} value={role} className="bg-slate-900 text-white">
+                    {role}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Button
+              type="button"
+              intent="secondary"
+              onClick={handleGenerateQuestions}
+              disabled={loadingQuestions}
             >
-              {roles.map((role) => (
-                <option key={role} value={role} className="bg-slate-900 text-white">
-                  {role}
-                </option>
-              ))}
-            </select>
-          </label>
-          <Button
-            type="button"
-            intent="secondary"
-            onClick={handleGenerateQuestions}
-            disabled={loadingQuestions}
-          >
-            {loadingQuestions ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Sparkles className="h-4 w-4" />
-            )}
-            Generate Questions
-          </Button>
+              {loadingQuestions ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+              Generate questions
+            </Button>
+          </div>
         </div>
+        <aside className="space-y-3 rounded-2xl border border-slate-800/50 bg-slate-950/60 p-5">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-200">
+            <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Quick tips
+          </h2>
+          <ul className="space-y-3 text-xs leading-relaxed text-slate-400">
+            {quickTips.map((tip) => (
+              <li key={tip} className="flex items-start gap-2">
+                <ArrowRight className="mt-0.5 h-3 w-3 text-indigo-400" />
+                <span>{tip}</span>
+              </li>
+            ))}
+          </ul>
+          {microphoneUnavailable && (
+            <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+              Browser does not expose microphone access. Type your responses manually or
+              switch browsers to use speech capture.
+            </p>
+          )}
+        </aside>
       </header>
 
       {questions.length === 0 ? (
@@ -299,7 +332,10 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
       ) : (
         <div className="space-y-6">
           {questions.map((question, index) => (
-            <div key={question} className="space-y-3">
+            <div
+              key={question}
+              className="space-y-3 rounded-3xl border border-slate-800/50 bg-slate-950/60 p-6"
+            >
               <QuestionCard
                 index={index}
                 question={question}
@@ -331,7 +367,7 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
                 ) : (
                   <span>
                     {recorderSupported
-                      ? "Use the microphone to capture a spoken answer."
+                      ? "Use the microphone, then refine the transcript inline."
                       : "Voice capture is not supported in this browser."}
                   </span>
                 )}
@@ -352,7 +388,7 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
           ) : (
             <Sparkles className="h-4 w-4" />
           )}
-          Get Feedback
+          Get feedback
         </Button>
         <Button
           type="button"
@@ -360,14 +396,14 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
           onClick={handleReset}
           disabled={questions.length === 0}
         >
-          Reset Session
+          Reset session
         </Button>
         {evaluation && (
           <Link
             href="/dashboard"
             className={buttonStyles({ intent: "secondary", size: "md" })}
           >
-            Save &amp; View Dashboard
+            Save &amp; view dashboard
           </Link>
         )}
       </div>

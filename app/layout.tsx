@@ -31,36 +31,44 @@ export default async function RootLayout({
 }>) {
   const { session } = await getOptionalServerSession();
 
+  const navLinks = [
+    { href: "/practice", label: "Practice" },
+    { href: "/dashboard", label: "Dashboard" },
+  ];
+
+  if (session) {
+    navLinks.push({ href: "/history", label: "History" });
+  }
+
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} bg-slate-950 text-slate-100`}
+        className={`${geistSans.variable} ${geistMono.variable} text-slate-100 antialiased`}
       >
         <ToastProvider>
           <div className="flex min-h-screen flex-col">
-            <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur">
-              <nav className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4">
+            <header className="sticky top-0 z-40 border-b border-slate-800/60 bg-slate-900/65 backdrop-blur-xl">
+              <nav className="mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-4">
                 <Link
                   href="/"
-                  className="text-lg font-semibold tracking-tight text-white"
+                  className="text-lg font-semibold tracking-tight text-white transition hover:text-indigo-300"
                 >
                   Interview Coach
                 </Link>
-                <div className="flex items-center gap-4 text-sm font-medium">
-                  <Link
-                    href="/practice"
-                    className="text-slate-300 transition hover:text-white"
-                  >
-                    Practice
-                  </Link>
-                  <Link
-                    href="/dashboard"
-                    className="text-slate-300 transition hover:text-white"
-                  >
-                    Dashboard
-                  </Link>
+                <div className="flex items-center gap-1 text-sm font-medium">
+                  {navLinks.map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className="rounded-md px-3 py-2 text-slate-300 transition hover:text-white"
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
                   {session ? (
-                    <LogoutButton intent="ghost" size="sm" />
+                    <LogoutButton intent="ghost" size="sm">
+                      Sign out
+                    </LogoutButton>
                   ) : (
                     <Link
                       href="/login"
@@ -72,20 +80,29 @@ export default async function RootLayout({
                 </div>
               </nav>
             </header>
-            <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-12">{children}</main>
-            <footer className="border-t border-slate-800 bg-slate-900/60 py-6">
-              <div className="mx-auto flex w-full max-w-6xl flex-col gap-2 px-4 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-                <p>
-                  © {new Date().getFullYear()} Interview Coach. Built with Next.js,
-                  Supabase, and OpenAI.
-                </p>
-                <p>
+            <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-12 md:py-16">
+              {children}
+            </main>
+            <footer className="border-t border-slate-800/70 bg-slate-900/70 py-6">
+              <div className="mx-auto flex w-full max-w-6xl flex-col gap-2 px-5 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+                <p>© {new Date().getFullYear()} Interview Coach. Prep with intention.</p>
+                <p className="flex items-center gap-3">
                   <Link
                     href="https://supabase.com"
-                    className="hover:text-slate-300"
+                    className="transition hover:text-slate-300"
                     target="_blank"
+                    rel="noreferrer"
                   >
                     Powered by Supabase
+                  </Link>
+                  <span className="text-slate-600">|</span>
+                  <Link
+                    href="https://openai.com"
+                    className="transition hover:text-slate-300"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Powered by OpenAI
                   </Link>
                 </p>
               </div>
