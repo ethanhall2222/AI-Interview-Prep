@@ -17,7 +17,11 @@ import QuestionCard from "@/components/QuestionCard";
 import ScoreCard from "@/components/ScoreCard";
 import { useToast } from "@/components/ToastProvider";
 import { interviewTypes } from "@/lib/schemas";
-import type { QuestionResponseType, StoredEvaluationType } from "@/lib/schemas";
+import type {
+  BodyFeedbackType,
+  QuestionResponseType,
+  StoredEvaluationType,
+} from "@/lib/schemas";
 
 type InterviewType = (typeof interviewTypes)[number];
 
@@ -28,6 +32,8 @@ interface PracticeClientProps {
 interface QuestionResponsePayload extends QuestionResponseType {
   message?: string;
 }
+
+type BodyFeedbackEntry = BodyFeedbackType | null;
 
 export default function PracticeClient({ roles }: PracticeClientProps) {
   const defaultRole = roles[0] ?? "";
@@ -41,9 +47,13 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
   const [submitting, setSubmitting] = useState(false);
   const [recordingIndex, setRecordingIndex] = useState<number | null>(null);
   const [transcribingIndex, setTranscribingIndex] = useState<number | null>(null);
+  const [analyzingIndex, setAnalyzingIndex] = useState<number | null>(null);
+  const [playingIndex, setPlayingIndex] = useState<number | null>(null);
   const [recorderSupported, setRecorderSupported] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [reviewMode, setReviewMode] = useState(false);
+  const [bodyFeedbacks, setBodyFeedbacks] = useState<BodyFeedbackEntry[]>([]);
+  const [videoPreviews, setVideoPreviews] = useState<(string | null)[]>([]);
 
   const mediaRecorderRef = useRef<Record<number, MediaRecorder | null>>({});
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -106,6 +116,13 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
     setEvaluation(null);
     setReviewMode(false);
     setCurrentIndex(0);
+    videoPreviews.forEach((url) => {
+      if (url) {
+        URL.revokeObjectURL(url);
+      }
+    });
+    setVideoPreviews([]);
+    setBodyFeedbacks([]);
 
     try {
       const response = await fetch("/api/questions", {
@@ -127,6 +144,8 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
       setRoleInput(normalizedRole);
       setQuestions(payload.questions);
       setAnswers(new Array(payload.questions.length).fill(""));
+      setBodyFeedbacks(Array.from({ length: payload.questions.length }, () => null));
+      setVideoPreviews(Array.from({ length: payload.questions.length }, () => null));
       setQuestionCount(payload.questions.length);
       publish("Question set ready. Time to craft your STAR answers.", "success");
     } catch (error) {
@@ -183,6 +202,44 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
     }
   };
 
+  const submitBodyFeedback = async (index: number, blob: Blob, question: string) => {
+    setAnalyzingIndex(index);
+
+    try {
+      const formData = new FormData();
+      formData.append("video", blob, `body-${Date.now()}.webm`);
+      formData.append("question", question);
+
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+        body: formData,
+      });
+
+      const payload = (await response.json()) as BodyFeedbackType & { message?: string };
+
+      if (!response.ok || !payload.summary) {
+        throw new Error(payload.message ?? "Body-language analysis failed.");
+      }
+
+      setBodyFeedbacks((current) => {
+        const next = [...current];
+        next[index] = {
+          question,
+          summary: payload.summary,
+          cues: payload.cues ?? [],
+        };
+        return next;
+      });
+    } catch (error) {
+      publish(
+        error instanceof Error ? error.message : "Unable to analyse body language.",
+        "error",
+      );
+    } finally {
+      setAnalyzingIndex(null);
+    }
+  };
+
   const stopRecording = (index: number) => {
     const recorder = mediaRecorderRef.current[index];
     if (recorder && recorder.state !== "inactive") {
@@ -203,7 +260,10 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
         stopRecording(recordingIndex);
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: { facingMode: "user" },
+      });
       mediaStreamRef.current = stream;
 
       const recorder = new MediaRecorder(stream);
@@ -219,10 +279,20 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
         stream.getTracks().forEach((track) => track.stop());
         const chunks = chunksRef.current[index] ?? [];
         delete chunksRef.current[index];
-        const blob = new Blob(chunks, { type: "audio/webm" });
+        const blob = new Blob(chunks, { type: "video/webm" });
+        const previewUrl = URL.createObjectURL(blob);
+        setVideoPreviews((current) => {
+          const next = [...current];
+          if (next[index]) {
+            URL.revokeObjectURL(next[index]!);
+          }
+          next[index] = previewUrl;
+          return next;
+        });
         mediaStreamRef.current = null;
         if (questions[index]) {
           void submitTranscription(index, blob, questions[index]);
+          void submitBodyFeedback(index, blob, questions[index]);
         }
       };
 
@@ -269,6 +339,44 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
     answers.length === questions.length &&
     answers.every((answer) => answer.trim().length >= 10);
 
+  const playQuestionAudio = async (text: string, index: number) => {
+    if (!text) {
+      return;
+    }
+
+    setPlayingIndex(index);
+
+    try {
+      const response = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+
+      if (!response.ok) {
+        const fallback = await response.json().catch(() => ({ message: "" }));
+        throw new Error(fallback.message ?? "Unable to generate audio.");
+      }
+
+      const blob = await response.blob();
+      if (blob.size === 0) {
+        setPlayingIndex(null);
+        return;
+      }
+
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audio.onended = () => {
+        URL.revokeObjectURL(url);
+        setPlayingIndex(null);
+      };
+      await audio.play();
+    } catch (error) {
+      setPlayingIndex(null);
+      publish(error instanceof Error ? error.message : "Unable to play audio.", "error");
+    }
+  };
+
   const handleAdvance = () => {
     if (!canAdvance) {
       publish("Record or type at least a few sentences before continuing.", "error");
@@ -309,6 +417,20 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
 
     setSubmitting(true);
 
+    const sanitizedBodyFeedbacks = bodyFeedbacks.reduce<BodyFeedbackType[]>(
+      (acc, entry, idx) => {
+        if (entry) {
+          acc.push({
+            question: questions[idx],
+            summary: entry.summary,
+            cues: entry.cues,
+          });
+        }
+        return acc;
+      },
+      [],
+    );
+
     try {
       const response = await fetch("/api/eval", {
         method: "POST",
@@ -318,6 +440,7 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
           interviewType,
           questions,
           answers,
+          bodyFeedbacks: sanitizedBodyFeedbacks,
         }),
       });
 
@@ -345,6 +468,13 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
     setEvaluation(null);
     setQuestions([]);
     setAnswers([]);
+    bodyFeedbacks.forEach((entry, idx) => {
+      if (videoPreviews[idx]) {
+        URL.revokeObjectURL(videoPreviews[idx]!);
+      }
+    });
+    setBodyFeedbacks([]);
+    setVideoPreviews([]);
     setCurrentIndex(0);
     setReviewMode(false);
     publish("Session reset. Draft fresh answers.", "info");
@@ -472,8 +602,34 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
               question={currentQuestion}
               value={currentAnswer}
               onChange={(value) => handleAnswerChange(currentIndex, value)}
-              disabled={submitting || transcribingIndex === currentIndex}
+              disabled={
+                submitting ||
+                transcribingIndex === currentIndex ||
+                analyzingIndex === currentIndex
+              }
             />
+            {videoPreviews[currentIndex] && (
+              <video
+                src={videoPreviews[currentIndex]!}
+                className="w-full rounded-xl border border-slate-800/70"
+                controls
+              />
+            )}
+            {bodyFeedbacks[currentIndex] && (
+              <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-4 text-xs text-slate-400">
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">
+                  Body language
+                </p>
+                <p className="mt-1 text-slate-300">
+                  {bodyFeedbacks[currentIndex]!.summary}
+                </p>
+                {bodyFeedbacks[currentIndex]!.cues.length > 0 && (
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    Cues: {bodyFeedbacks[currentIndex]!.cues.join(", ")}
+                  </p>
+                )}
+              </div>
+            )}
             <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
               <Button
                 type="button"
@@ -481,7 +637,10 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
                 size="sm"
                 onClick={() => toggleRecording(currentIndex)}
                 disabled={
-                  !recorderSupported || submitting || transcribingIndex === currentIndex
+                  !recorderSupported ||
+                  submitting ||
+                  transcribingIndex === currentIndex ||
+                  analyzingIndex === currentIndex
                 }
               >
                 {recordingIndex === currentIndex ? (
@@ -491,9 +650,28 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
                 )}
                 {recordingIndex === currentIndex ? "Stop recording" : "Record answer"}
               </Button>
+              <Button
+                type="button"
+                intent="ghost"
+                size="sm"
+                onClick={() => playQuestionAudio(currentQuestion, currentIndex)}
+                disabled={submitting || playingIndex === currentIndex}
+              >
+                {playingIndex === currentIndex ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Headphones className="h-4 w-4" />
+                )}
+                Hear question
+              </Button>
               {transcribingIndex === currentIndex ? (
                 <span className="inline-flex items-center gap-2 text-slate-300">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" /> Transcribing…
+                </span>
+              ) : analyzingIndex === currentIndex ? (
+                <span className="inline-flex items-center gap-2 text-slate-300">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Analysing body
+                  language…
                 </span>
               ) : (
                 <span>
@@ -516,7 +694,11 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
               <Button
                 type="button"
                 onClick={handleAdvance}
-                disabled={submitting || transcribingIndex === currentIndex}
+                disabled={
+                  submitting ||
+                  transcribingIndex === currentIndex ||
+                  analyzingIndex === currentIndex
+                }
               >
                 {isLastQuestion ? "Finish answers" : "Next question"}
               </Button>
@@ -543,6 +725,26 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
                 onChange={(value) => handleAnswerChange(index, value)}
                 disabled={submitting || transcribingIndex === index}
               />
+              {videoPreviews[index] && (
+                <video
+                  src={videoPreviews[index]!}
+                  className="w-full rounded-xl border border-slate-800/70"
+                  controls
+                />
+              )}
+              {bodyFeedbacks[index] && (
+                <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-4 text-xs text-slate-400">
+                  <p className="text-[11px] uppercase tracking-wide text-slate-500">
+                    Body language
+                  </p>
+                  <p className="mt-1 text-slate-300">{bodyFeedbacks[index]!.summary}</p>
+                  {bodyFeedbacks[index]!.cues.length > 0 && (
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Cues: {bodyFeedbacks[index]!.cues.join(", ")}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>

@@ -19,6 +19,12 @@ export const interviewTypes = ["behavioral", "situational", "technical"] as cons
 
 export const interviewTypeSchema = z.enum(interviewTypes);
 
+export const bodyFeedbackSchema = z.object({
+  question: z.string().min(3).optional(),
+  summary: z.string().min(5),
+  cues: z.array(z.string().min(2)).max(8),
+});
+
 export const QuestionResponse = z.object({
   questions: z.array(z.string().min(5).max(220)).min(1).max(6),
 });
@@ -45,7 +51,7 @@ export const EvalByAnswer = z.object({
 
 export const EvalFeedback = z.object({
   summary: z.string().min(5).max(400),
-  by_answer: z.array(EvalByAnswer).length(3),
+  by_answer: z.array(EvalByAnswer).min(1).max(6),
 });
 
 export const EvalPayload = z.object({
@@ -56,6 +62,7 @@ export const EvalPayload = z.object({
     .object({
       interviewType: interviewTypeSchema,
       questionCount: z.number().int().min(1).max(6),
+      bodyFeedback: z.array(bodyFeedbackSchema).optional(),
     })
     .optional(),
 });
@@ -65,6 +72,7 @@ export const EvalRequestPayload = z.object({
   interviewType: interviewTypeSchema,
   questions: z.array(z.string().min(5).max(220)).min(1).max(6),
   answers: z.array(z.string().min(5).max(1600)).min(1).max(6),
+  bodyFeedbacks: z.array(bodyFeedbackSchema).max(6).optional(),
 });
 
 export const StoredEvaluation = z.object({
@@ -75,6 +83,7 @@ export const StoredEvaluation = z.object({
     .object({
       interviewType: interviewTypeSchema,
       questionCount: z.number().int().min(1).max(6),
+      bodyFeedback: z.array(bodyFeedbackSchema).optional(),
     })
     .optional(),
 });
@@ -105,3 +114,5 @@ export type EvalPayloadType = z.infer<typeof EvalPayload>;
 export type EvalRequestPayloadType = z.infer<typeof EvalRequestPayload>;
 export type StoredEvaluationType = z.infer<typeof StoredEvaluation>;
 export type SessionRowType = z.infer<typeof SessionRow>;
+export type InterviewType = (typeof interviewTypes)[number];
+export type BodyFeedbackType = z.infer<typeof bodyFeedbackSchema>;

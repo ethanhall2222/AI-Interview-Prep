@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+
 import { evaluateSession } from "@/lib/ai";
 import { getRouteHandlerSession } from "@/lib/auth-helpers";
 import { EvalRequestPayload, SessionInsertPayload } from "@/lib/schemas";
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
     const { error } = await supabase.from("sessions").insert(insertPayload);
 
     if (error) {
-      throw error;
+      console.error("Failed to save session", error);
     }
 
     return NextResponse.json(evaluation);

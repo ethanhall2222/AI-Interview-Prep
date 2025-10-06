@@ -95,6 +95,26 @@ export default async function HistoryPage() {
                       ))}
                     </ul>
                   )}
+                  {session.scores.meta?.bodyFeedback &&
+                    session.scores.meta.bodyFeedback.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-[11px] uppercase tracking-wide text-slate-500">
+                          Body language
+                        </p>
+                        <ul className="space-y-1 text-slate-400">
+                          {session.scores.meta.bodyFeedback.map((item, idx) => (
+                            <li key={(item.question ?? "body") + idx}>
+                              <span className="text-slate-300">{item.summary}</span>
+                              {item.cues.length > 0 && (
+                                <span className="block text-[11px] text-slate-500">
+                                  Cues: {item.cues.join(", ")}
+                                </span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                 </div>
               </div>
 

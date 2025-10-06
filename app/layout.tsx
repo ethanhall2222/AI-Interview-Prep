@@ -38,6 +38,7 @@ export default async function RootLayout({
 
   if (session) {
     navLinks.push({ href: "/history", label: "History" });
+    navLinks.push({ href: "/jobs", label: "Job helper" });
   }
 
   return (

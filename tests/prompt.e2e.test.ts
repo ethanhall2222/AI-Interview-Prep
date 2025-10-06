@@ -13,7 +13,7 @@ describe("prompt builders", () => {
 
     expect(prompt).toContain("Data Analyst");
     expect(prompt).toContain("behavioral interview questions");
-    expect(prompt).toContain("seed \"test-seed\"");
+    expect(prompt).toContain('seed "test-seed"');
     expect(prompt).toContain("Return JSON with 4 items");
   });
 

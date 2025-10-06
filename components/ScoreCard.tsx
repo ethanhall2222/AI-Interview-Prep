@@ -98,6 +98,30 @@ export function ScoreCard({ evaluation, heading = "Session Feedback" }: ScoreCar
           </ul>
         </div>
       )}
+
+      {meta?.bodyFeedback && meta.bodyFeedback.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-slate-200">Body language insights</h3>
+          <div className="space-y-2 text-xs text-slate-400">
+            {meta.bodyFeedback.map((item, idx) => (
+              <div
+                key={(item.question ?? "body") + idx}
+                className="rounded-lg border border-slate-800 bg-slate-950/60 p-3"
+              >
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">
+                  {item.question ?? `Answer ${idx + 1}`}
+                </p>
+                <p className="mt-1 text-slate-300">{item.summary}</p>
+                {item.cues.length > 0 && (
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    Cues: {item.cues.join(", ")}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </section>
   );
 }
