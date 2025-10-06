@@ -4,7 +4,7 @@ import { FormEvent, useState } from "react";
 
 import { Button } from "@/components/Button";
 import { useToast } from "@/components/ToastProvider";
-import { getSupabaseBrowserClient } from "@/lib/supabase-client";
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 export default function LoginForm() {
   const [email, setEmail] = useState("");

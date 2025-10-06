@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { Button, type ButtonProps } from "@/components/Button";
 import { useToast } from "@/components/ToastProvider";
-import { getSupabaseBrowserClient } from "@/lib/supabase-client";
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 export default function LogoutButton(props: Omit<ButtonProps, "onClick">) {
   const [loading, setLoading] = useState(false);

@@ -1,5 +1,4 @@
 import {
-  createBrowserClient,
   createServerComponentClient,
   createRouteHandlerClient,
 } from "@supabase/auth-helpers-nextjs";
@@ -20,17 +19,10 @@ function resolveSupabaseEnv() {
   return { url, anonKey };
 }
 
-export function getSupabaseBrowserClient() {
-  const { url, anonKey } = resolveSupabaseEnv();
-  return createBrowserClient(url, anonKey);
-}
-
 export function getSupabaseServerComponentClient<Database = Record<string, never>>() {
   const { url, anonKey } = resolveSupabaseEnv();
   return createServerComponentClient<Database>(
-    {
-      cookies,
-    },
+    { cookies },
     {
       supabaseUrl: url,
       supabaseKey: anonKey,
@@ -41,9 +33,7 @@ export function getSupabaseServerComponentClient<Database = Record<string, never
 export function getSupabaseRouteHandlerClient<Database = Record<string, never>>() {
   const { url, anonKey } = resolveSupabaseEnv();
   return createRouteHandlerClient<Database>(
-    {
-      cookies,
-    },
+    { cookies },
     {
       supabaseUrl: url,
       supabaseKey: anonKey,

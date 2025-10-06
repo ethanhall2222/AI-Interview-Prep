@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import type { Session } from "@supabase/auth-helpers-nextjs";
-import type { TypedSupabaseClient } from "./supabase-client";
+import type { TypedSupabaseClient } from "./supabase-server";
 import {
   getSupabaseRouteHandlerClient,
   getSupabaseServerComponentClient,
-} from "./supabase-client";
+} from "./supabase-server";
 
 export async function requireServerSession() {
   const supabase = getSupabaseServerComponentClient();
