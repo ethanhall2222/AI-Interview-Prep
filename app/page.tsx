@@ -14,7 +14,7 @@ const featureCards = [
   {
     title: "STAR feedback",
     description:
-      "Structured scoring that pinpoints gaps in structure, relevance, impact, and delivery for each answer.",
+      "Structured scoring that pinpoints gaps in structure, relevance, impact, and delivery for every spoken or typed answer.",
     icon: ClipboardCheck,
   },
   {
@@ -49,8 +49,9 @@ export default async function Home() {
             Mock interviews that actually prepare you for the real thing.
           </h1>
           <p className="max-w-2xl text-lg text-slate-100">
-            Run focused, three-question drills, get honest STAR-aligned feedback, and keep
-            every result in one Supabase-powered dashboard.
+            Run focused, three-question drills, speak your answers aloud, review the
+            auto-transcribed notes, and keep every result in one Supabase-powered
+            dashboard.
           </p>
           <div className="flex flex-wrap gap-4">
             <Link

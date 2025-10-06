@@ -39,7 +39,7 @@ export function QuestionCard({
         <textarea
           value={value}
           onChange={handleChange}
-          placeholder="Structure your answer with STAR: Situation, Task, Action, Result."
+          placeholder="Speak and refine using STAR: Situation, Task, Action, Result."
           className={cn(
             "min-h-[160px] w-full resize-y rounded-xl border bg-slate-950/60 p-4 text-sm text-slate-100 shadow-inner transition",
             "border-slate-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40",
