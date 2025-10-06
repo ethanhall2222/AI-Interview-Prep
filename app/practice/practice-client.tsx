@@ -2,7 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Loader2, Mic, Sparkles, Square } from "lucide-react";
+import {
+  ArrowRight,
+  CheckCircle2,
+  Headphones,
+  Loader2,
+  Mic,
+  Sparkles,
+  Square,
+} from "lucide-react";
 
 import { Button, buttonStyles } from "@/components/Button";
 import QuestionCard from "@/components/QuestionCard";
