@@ -1,10 +1,11 @@
 @import "tailwindcss";
 
 :root {
-  --background: #040712;
-  --foreground: #f8fafc;
-  --muted: rgba(148, 163, 184, 0.6);
-  --accent: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
+  --background: #04070f;
+  --foreground: #e2e8f0;
+  --muted: rgba(148, 163, 184, 0.55);
+  --accent: linear-gradient(135deg, #1e3a8a 0%, #1e40af 45%, #2563eb 100%);
+  --panel: rgba(12, 18, 32, 0.8);
 }
 
 @theme inline {
@@ -23,8 +24,8 @@ html,
 body {
   min-height: 100%;
   background:
-    radial-gradient(circle at top left, rgba(148, 163, 184, 0.18), transparent 45%),
-    radial-gradient(circle at bottom right, rgba(99, 102, 241, 0.16), transparent 40%),
+    radial-gradient(circle at 15% 20%, rgba(37, 99, 235, 0.14), transparent 45%),
+    radial-gradient(circle at 85% 10%, rgba(30, 64, 175, 0.12), transparent 40%),
     var(--background);
   color: var(--foreground);
   font-family:
@@ -42,12 +43,12 @@ a {
 }
 
 ::selection {
-  background: rgba(99, 102, 241, 0.25);
+  background: rgba(37, 99, 235, 0.28);
   color: var(--foreground);
 }
 
 .backdrop-card {
-  background: rgba(15, 23, 42, 0.72);
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  box-shadow: 0 18px 50px -25px rgba(99, 102, 241, 0.45);
+  background: var(--panel);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  box-shadow: 0 18px 48px -28px rgba(15, 23, 42, 0.6);
 }
