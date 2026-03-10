@@ -30,13 +30,20 @@ export async function POST(request: Request) {
       feedback: evaluation.feedback.summary,
     });
 
-    const { error } = await supabase.from("sessions").insert(insertPayload);
+    const { data: insertedSession, error } = await supabase
+      .from("sessions")
+      .insert(insertPayload)
+      .select("id")
+      .single();
 
     if (error) {
       console.error("Failed to save session", error);
     }
 
-    return NextResponse.json(evaluation);
+    return NextResponse.json({
+      ...evaluation,
+      sessionId: insertedSession?.id,
+    });
   } catch (error) {
     if (error instanceof SyntaxError) {
       return NextResponse.json({ message: "Invalid JSON payload." }, { status: 400 });

@@ -4,6 +4,13 @@ import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs";
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
+  const hasSupabaseEnv = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  );
+
+  if (!hasSupabaseEnv) {
+    return res;
+  }
 
   const supabase = createMiddlewareClient(
     { req, res },

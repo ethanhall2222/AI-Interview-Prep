@@ -18,7 +18,10 @@ export default function LoginForm() {
     const supabase = getSupabaseBrowserClient();
 
     try {
-      const redirectBase = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+      const redirectBase =
+        typeof window !== "undefined"
+          ? window.location.origin
+          : process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
       const nextPath = "/practice";
 
       const { error } = await supabase.auth.signInWithOtp({
@@ -59,7 +62,7 @@ export default function LoginForm() {
           required
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          className="w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-slate-100 focus:border-indigo-400 focus:outline-none"
+          className="w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-slate-100 focus:border-[#eaaa00] focus:outline-none"
           placeholder="you@example.com"
         />
       </div>

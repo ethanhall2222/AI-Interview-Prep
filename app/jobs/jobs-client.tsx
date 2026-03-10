@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 
 import { Clipboard, ClipboardCheck, Loader2, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/Button";
 import { useToast } from "@/components/ToastProvider";
+import WorkflowRail from "@/components/WorkflowRail";
 
 interface JobHelperResult {
   applicationSummary: string;
@@ -27,7 +29,18 @@ interface JobHelperResult {
 const defaultFocus =
   "Highlight cross-functional leadership, quantitative impact, and user-centric delivery.";
 
-export default function JobsClient() {
+type JobsClientProps = {
+  canPersist: boolean;
+  initialParams: {
+    jobTitle?: string;
+    company?: string;
+    jobUrl?: string;
+  };
+};
+
+const REQUEST_TIMEOUT_MS = 15000;
+
+export default function JobsClient({ canPersist, initialParams }: JobsClientProps) {
   const [jobTitle, setJobTitle] = useState("");
   const [company, setCompany] = useState("");
   const [jobDescription, setJobDescription] = useState("");
@@ -36,22 +49,55 @@ export default function JobsClient() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<JobHelperResult | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [prefillApplied, setPrefillApplied] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const [requestAttempts, setRequestAttempts] = useState(0);
 
   const { publish } = useToast();
 
-  const handleSubmit = async () => {
+  useEffect(() => {
+    if (prefillApplied) {
+      return;
+    }
+    const prefillTitle = initialParams.jobTitle?.trim();
+    const prefillCompany = initialParams.company?.trim();
+    const prefillUrl = initialParams.jobUrl?.trim();
+    if (!prefillTitle && !prefillCompany && !prefillUrl) {
+      setPrefillApplied(true);
+      return;
+    }
+    if (prefillTitle) {
+      setJobTitle(prefillTitle);
+    }
+    if (prefillCompany) {
+      setCompany(prefillCompany);
+    }
+    if (prefillUrl) {
+      setJobDescription((current) =>
+        current.trim().length > 0 ? current : `Posting URL: ${prefillUrl}`,
+      );
+    }
+    setPrefillApplied(true);
+  }, [initialParams, prefillApplied]);
+
+  const runGenerate = async () => {
     if (!jobTitle || !company || !jobDescription || !resumeSummary) {
       publish("Fill in job title, company, description, and your summary.", "error");
       return;
     }
 
     setLoading(true);
+    setRequestAttempts((current) => current + 1);
+    setRequestError(null);
     setResult(null);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
     try {
       const response = await fetch("/api/job-helper", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           jobTitle,
           company,
@@ -68,10 +114,19 @@ export default function JobsClient() {
       }
 
       setResult(payload);
+      setRequestError(null);
       publish("Draft package ready. Tailor and paste into your application.", "success");
     } catch (error) {
-      publish(error instanceof Error ? error.message : "Something went wrong.", "error");
+      const message =
+        error instanceof Error
+          ? error.name === "AbortError"
+            ? "Request timed out. You can retry or continue manually."
+            : error.message
+          : "Something went wrong.";
+      setRequestError(message);
+      publish(message, "error");
     } finally {
+      window.clearTimeout(timeout);
       setLoading(false);
     }
   };
@@ -87,11 +142,16 @@ export default function JobsClient() {
     }
   };
 
-  const renderCopyButton = (label: string, value: string, size: "sm" | "xs" = "sm") => (
+  const renderCopyButton = (
+    label: string,
+    value: string,
+    size: "sm" | "xs" = "sm",
+  ) => (
     <Button
       type="button"
       intent="ghost"
-      size={size}
+      size="sm"
+      className={size === "xs" ? "h-7 px-2 text-[11px]" : undefined}
       onClick={() => copyToClipboard(label, value)}
     >
       {copiedField === label ? (
@@ -105,15 +165,28 @@ export default function JobsClient() {
 
   return (
     <div className="space-y-10">
+      <WorkflowRail current="jobs" />
       <header className="space-y-3">
         <h1 className="text-3xl font-semibold text-slate-50">
-          Job application assistant
+          Job Lab
         </h1>
         <p className="text-sm leading-relaxed text-slate-300">
           Paste the job description, add a quick summary of your experience, and let the
           AI draft targeted value props, recruiter-ready answers, and auto-fill
           suggestions for common forms.
         </p>
+        {!canPersist && (
+          <p className="rounded-md border border-[#eaaa00]/40 bg-[#eaaa00]/10 px-3 py-2 text-xs text-[#ffe49a]">
+            Guest mode: drafting works, but generated packages are not saved to your
+            dashboard until you log in.
+          </p>
+        )}
+        <Link
+          href="/jobs/portal"
+          className="inline-flex items-center gap-2 rounded-full border border-[#eaaa00]/40 bg-[#eaaa00]/10 px-3 py-1 text-xs font-medium text-[#f4d27d] transition hover:bg-[#eaaa00]/20"
+        >
+          Open application tracker
+        </Link>
       </header>
 
       <section className="grid gap-6 rounded-3xl border border-slate-800/60 bg-slate-950/70 p-6 md:grid-cols-2">
@@ -124,7 +197,7 @@ export default function JobsClient() {
               value={jobTitle}
               onChange={(event) => setJobTitle(event.target.value)}
               placeholder="Staff Product Manager"
-              className="w-full rounded-lg border border-slate-700/70 bg-slate-950/80 px-3 py-2 text-sm text-white focus:border-blue-400 focus:outline-none"
+              className="w-full rounded-lg border border-slate-700/70 bg-slate-950/80 px-3 py-2 text-sm text-white focus:border-[#eaaa00] focus:outline-none"
             />
           </div>
           <div className="space-y-2">
@@ -133,7 +206,7 @@ export default function JobsClient() {
               value={company}
               onChange={(event) => setCompany(event.target.value)}
               placeholder="Acme Corp"
-              className="w-full rounded-lg border border-slate-700/70 bg-slate-950/80 px-3 py-2 text-sm text-white focus:border-blue-400 focus:outline-none"
+              className="w-full rounded-lg border border-slate-700/70 bg-slate-950/80 px-3 py-2 text-sm text-white focus:border-[#eaaa00] focus:outline-none"
             />
           </div>
           <div className="space-y-2">
@@ -144,7 +217,7 @@ export default function JobsClient() {
               value={resumeSummary}
               onChange={(event) => setResumeSummary(event.target.value)}
               placeholder="3-4 bullet summary of your experience and impact."
-              className="min-h-[120px] w-full rounded-lg border border-slate-700/70 bg-slate-950/80 px-3 py-2 text-sm text-white focus:border-blue-400 focus:outline-none"
+              className="min-h-[120px] w-full rounded-lg border border-slate-700/70 bg-slate-950/80 px-3 py-2 text-sm text-white focus:border-[#eaaa00] focus:outline-none"
             />
           </div>
         </div>
@@ -157,7 +230,7 @@ export default function JobsClient() {
               value={jobDescription}
               onChange={(event) => setJobDescription(event.target.value)}
               placeholder="Paste the job description here."
-              className="min-h-[200px] w-full rounded-lg border border-slate-700/70 bg-slate-950/80 px-3 py-2 text-sm text-white focus:border-blue-400 focus:outline-none"
+              className="min-h-[200px] w-full rounded-lg border border-slate-700/70 bg-slate-950/80 px-3 py-2 text-sm text-white focus:border-[#eaaa00] focus:outline-none"
             />
           </div>
           <div className="space-y-2">
@@ -167,14 +240,14 @@ export default function JobsClient() {
             <textarea
               value={focusAreas}
               onChange={(event) => setFocusAreas(event.target.value)}
-              className="min-h-[80px] w-full rounded-lg border border-slate-700/70 bg-slate-950/80 px-3 py-2 text-sm text-white focus:border-blue-400 focus:outline-none"
+              className="min-h-[80px] w-full rounded-lg border border-slate-700/70 bg-slate-950/80 px-3 py-2 text-sm text-white focus:border-[#eaaa00] focus:outline-none"
             />
           </div>
         </div>
       </section>
 
       <div className="flex items-center gap-3">
-        <Button type="button" onClick={handleSubmit} disabled={loading}>
+        <Button type="button" onClick={runGenerate} disabled={loading}>
           {loading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
@@ -186,6 +259,25 @@ export default function JobsClient() {
           We’ll save the generated output so you can revisit or tweak it later.
         </p>
       </div>
+
+      {requestError && (
+        <section className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-100">
+          <p className="font-semibold">Job Lab request failed</p>
+          <p className="mt-1 text-red-200/90">{requestError}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button type="button" intent="secondary" size="sm" onClick={runGenerate}>
+              Retry generation
+            </Button>
+            <span className="self-center text-xs text-red-200/80">
+              Attempts: {requestAttempts}
+            </span>
+          </div>
+          <p className="mt-3 text-xs text-red-200/90">
+            You can still continue by copying the job description and drafting manually
+            in Resume Review and Practice.
+          </p>
+        </section>
+      )}
 
       {result && (
         <section className="space-y-6 rounded-3xl border border-slate-800/60 bg-slate-950/60 p-6">

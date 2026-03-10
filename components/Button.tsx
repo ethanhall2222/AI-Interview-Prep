@@ -8,12 +8,12 @@ export const buttonStyles = cva(
     variants: {
       intent: {
         primary:
-          "bg-indigo-500 text-white hover:bg-indigo-400 focus-visible:outline-indigo-300",
+          "bg-[#002855] text-[#f7f3e8] hover:bg-[#004a98] focus-visible:outline-[#eaaa00]",
         secondary:
-          "border border-slate-700 bg-slate-900 text-slate-200 hover:border-slate-500 focus-visible:outline-slate-400",
+          "border border-[#eaaa00]/40 bg-slate-900 text-[#f7d77c] hover:border-[#eaaa00]/70 hover:text-[#ffe7a6] focus-visible:outline-[#eaaa00]",
         subtle:
           "bg-slate-800/80 text-slate-100 hover:bg-slate-700/60 focus-visible:outline-slate-300",
-        ghost: "text-slate-300 hover:text-white",
+        ghost: "text-[#d2dce8] hover:text-[#ffd76a]",
       },
       size: {
         sm: "px-3 py-1.5",

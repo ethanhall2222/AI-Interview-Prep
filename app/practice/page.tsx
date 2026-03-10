@@ -6,5 +6,5 @@ import PracticeClient from "./practice-client";
 export default async function PracticePage() {
   await requireServerSession();
 
-  return <PracticeClient roles={roleSuggestions} />;
+  return <PracticeClient roles={[...roleSuggestions]} />;
 }

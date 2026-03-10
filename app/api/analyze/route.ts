@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
     const videoFile = await toFile(video, video.name || "answer.webm");
-    const uploaded = await openai.files.create({ file: videoFile, purpose: "responses" });
+    const uploaded = await openai.files.create({ file: videoFile, purpose: "assistants" });
 
     const prompt = `You are analyzing a candidate's recorded mock interview answer to the question: "${question}".
 Provide a concise summary of their body language and delivery, then list 2-4 short cues that would help them improve (posture, facial expression, pacing, gestures).
@@ -59,10 +59,8 @@ Return JSON.`;
           content: [
             { type: "input_text", text: prompt },
             {
-              type: "input_video",
-              video: {
-                file_id: uploaded.id,
-              },
+              type: "input_file",
+              file_id: uploaded.id,
             },
           ],
         },

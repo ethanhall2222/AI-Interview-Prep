@@ -57,7 +57,7 @@ export default async function HistoryPage() {
                     {session.role}
                   </h2>
                 </div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/40 bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-200">
+                <div className="inline-flex items-center gap-2 rounded-full border border-[#eaaa00]/40 bg-[#eaaa00]/10 px-3 py-1 text-xs font-semibold text-[#f4d27d]">
                   Overall {session.scores.scores.overall.toFixed(1)} / 10
                 </div>
               </header>
@@ -86,11 +86,11 @@ export default async function HistoryPage() {
                     Snapshot insight
                   </p>
                   <p className="leading-relaxed text-slate-300">
-                    {session.feedback.summary}
+                    {session.feedback}
                   </p>
-                  {session.tips_next_time.length > 0 && (
+                  {session.scores.tips_next_time.length > 0 && (
                     <ul className="space-y-1 text-slate-400">
-                      {session.tips_next_time.map((tip) => (
+                      {session.scores.tips_next_time.map((tip: string) => (
                         <li key={tip}>• {tip}</li>
                       ))}
                     </ul>
@@ -135,7 +135,7 @@ export default async function HistoryPage() {
                 </div>
                 <Link
                   href={`/dashboard/${session.id}`}
-                  className="rounded-full border border-slate-700 px-3 py-1 text-indigo-200 transition hover:border-indigo-400 hover:text-indigo-100"
+                  className="rounded-full border border-slate-700 px-3 py-1 text-[#f4d27d] transition hover:border-[#eaaa00]/70 hover:text-[#ffe49a]"
                 >
                   Open full report
                 </Link>

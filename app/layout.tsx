@@ -7,7 +7,7 @@ import "@/styles/globals.css";
 import LogoutButton from "@/components/LogoutButton";
 import { ToastProvider } from "@/components/ToastProvider";
 import { buttonStyles } from "@/components/Button";
-import { getOptionalServerSession } from "@/lib/auth-helpers";
+import { getOptionalServerSession, isAdminEmail } from "@/lib/auth-helpers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,8 +20,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Interview Coach",
-  description: "AI-powered mock interview practice",
+  title: "Hire Ground",
+  description: "AI interview prep and job application tracking",
 };
 
 export default async function RootLayout({
@@ -32,13 +32,22 @@ export default async function RootLayout({
   const { session } = await getOptionalServerSession();
 
   const navLinks = [
+    { href: "/resume-review", label: "Resume review" },
+    { href: "/interview-prep", label: "Interview prep" },
+    { href: "/tracker", label: "Tracker" },
     { href: "/practice", label: "Practice" },
     { href: "/dashboard", label: "Dashboard" },
+    { href: "/about", label: "About" },
+    { href: "/privacy", label: "Privacy" },
   ];
 
   if (session) {
     navLinks.push({ href: "/history", label: "History" });
-    navLinks.push({ href: "/jobs", label: "Job helper" });
+    navLinks.push({ href: "/jobs", label: "Job lab" });
+    navLinks.push({ href: "/jobs/portal", label: "Job portal" });
+    if (isAdminEmail(session.user.email)) {
+      navLinks.push({ href: "/admin/jobs", label: "Admin" });
+    }
   }
 
   return (
@@ -52,9 +61,9 @@ export default async function RootLayout({
               <nav className="mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-4">
                 <Link
                   href="/"
-                  className="text-lg font-semibold tracking-tight text-white transition hover:text-indigo-300"
+                  className="text-lg font-semibold tracking-tight text-white transition hover:text-[#ffd76a]"
                 >
-                  Interview Coach
+                  Hire Ground
                 </Link>
                 <div className="flex items-center gap-1 text-sm font-medium">
                   {navLinks.map((link) => (
@@ -86,7 +95,9 @@ export default async function RootLayout({
             </main>
             <footer className="border-t border-slate-800/70 bg-slate-900/70 py-6">
               <div className="mx-auto flex w-full max-w-6xl flex-col gap-2 px-5 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-                <p>© {new Date().getFullYear()} Interview Coach. Prep with intention.</p>
+                <p>
+                  © {new Date().getFullYear()} Hire Ground. Prep with intention.
+                </p>
                 <p className="flex items-center gap-3">
                   <Link
                     href="https://supabase.com"

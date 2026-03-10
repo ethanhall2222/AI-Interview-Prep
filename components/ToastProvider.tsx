@@ -44,7 +44,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 toast.status === "error"
                   ? "border-red-500/40 bg-red-500/20 text-red-100"
                   : toast.status === "success"
-                    ? "border-emerald-500/40 bg-emerald-500/20 text-emerald-100"
+                    ? "border-[#eaaa00]/50 bg-[#eaaa00]/20 text-[#fff1c7]"
                     : "border-slate-700 bg-slate-800 text-slate-100"
               }`}
             >

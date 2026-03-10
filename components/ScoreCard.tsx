@@ -31,7 +31,7 @@ export function ScoreCard({ evaluation, heading = "Session Feedback" }: ScoreCar
             </p>
           )}
         </div>
-        <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/20 px-4 py-2 text-emerald-200">
+        <div className="inline-flex items-center gap-2 rounded-full bg-[#eaaa00]/20 px-4 py-2 text-[#ffe49a]">
           <Sparkles className="h-4 w-4" />
           <span className="text-sm font-semibold">
             Overall {scores.overall.toFixed(1)} / 10
@@ -43,7 +43,7 @@ export function ScoreCard({ evaluation, heading = "Session Feedback" }: ScoreCar
         {scoreEntries.map((item) => (
           <div
             key={item.label}
-            className="rounded-xl border border-emerald-500/10 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-100"
+            className="rounded-xl border border-[#eaaa00]/25 bg-[#eaaa00]/10 px-4 py-3 text-sm text-[#ffefc1]"
           >
             <p className="font-medium">{item.label}</p>
             <p className="text-xs">{item.value.toFixed(1)} / 10</p>

@@ -1,36 +1,101 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Hire Ground
 
-## Getting Started
+WVU-themed interview prep and job application tracker built with Next.js + Supabase.
 
-First, run the development server:
+## Run App
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+App runs at `http://localhost:3000` by default (or next available port).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Free Local Supabase Setup (Auth + Magic Link + DB)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+This project includes local migrations under `supabase/migrations` for:
+- `profiles`
+- `sessions`
+- `job_applications`
 
-## Learn More
+### 1) Install prerequisites
+- Docker Desktop
+- Supabase CLI
 
-To learn more about Next.js, take a look at the following resources:
+### 2) Start local Supabase
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+supabase start
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 3) Copy local env values
 
-## Deploy on Vercel
+```bash
+supabase status -o env
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Copy those values into `.env.local`:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Set:
+- `NEXT_PUBLIC_APP_URL` to your current app URL (example: `http://localhost:3001`)
+- `ADMIN_EMAILS` to your admin email list
+
+### 4) Apply migrations
+
+If the DB is fresh, migrations are applied on `supabase start`.
+If needed, run:
+
+```bash
+supabase db reset
+```
+
+### 5) Magic-link email inbox (local)
+
+Supabase local includes an email catcher UI.
+After `supabase start`, run:
+
+```bash
+supabase status
+```
+
+Open the `Inbucket` URL shown there, then click the magic link email.
+
+### 6) Auth redirect URL
+
+Use:
+- `http://localhost:3000/auth/callback`
+- or your active port, e.g. `http://localhost:3001/auth/callback`
+
+The login form now uses the browser origin automatically, so it works on non-3000 ports.
+
+## Airtable Job Scrape Pipeline
+
+Add these variables to `.env.local`:
+- `AIRTABLE_PAT`
+- `AIRTABLE_BASE_ID`
+- `AIRTABLE_TABLE_NAME` (default: `JobPostings`)
+- `JOB_SOURCE_URLS` (newline or comma-separated source URLs, prefer Lever/Ashby role pages)
+
+If Airtable is not configured, the app automatically stores scraped postings in local
+Supabase table `external_job_postings`.
+
+Create an Airtable table with fields:
+- `Title` (single line text)
+- `Company` (single line text)
+- `Location` (single line text)
+- `URL` (url)
+- `Source` (url or text)
+- `Snippet` (long text)
+- `PostedAt` (date/time)
+- `ExternalId` (single line text)
+- `LastSeenAt` (date/time)
+
+Run sync from:
+- `POST /api/jobs/sync` (admin-only)
+- Or use the Admin Jobs page button at `/admin/jobs`.
+
+Tracked users can view synced postings at:
+- `/jobs/portal`

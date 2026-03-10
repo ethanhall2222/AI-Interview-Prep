@@ -121,7 +121,7 @@ function buildFormat(name: string, schema: unknown) {
   return {
     type: "json_schema" as const,
     name,
-    schema,
+    schema: schema as Record<string, unknown>,
   };
 }
 

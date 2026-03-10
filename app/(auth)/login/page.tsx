@@ -16,7 +16,7 @@ export default async function LoginPage() {
     <div className="mx-auto flex w-full max-w-md flex-col gap-8 rounded-3xl border border-slate-800 bg-slate-950/70 p-10 text-slate-200 shadow">
       <div className="space-y-3 text-center">
         <h1 className="text-2xl font-semibold text-slate-50">
-          Log in to Interview Coach
+          Log in to Hire Ground
         </h1>
         <p className="text-sm text-slate-400">
           We will email you a magic link. You must confirm the link on this device to
@@ -26,11 +26,11 @@ export default async function LoginPage() {
       <LoginForm />
       <div className="text-center text-xs text-slate-500">
         By continuing you agree to our{" "}
-        <Link href="#" className="text-indigo-300 hover:text-indigo-200">
+        <Link href="#" className="text-[#f4d27d] hover:text-[#ffe49a]">
           terms of service
         </Link>{" "}
         and{" "}
-        <Link href="#" className="text-indigo-300 hover:text-indigo-200">
+        <Link href="#" className="text-[#f4d27d] hover:text-[#ffe49a]">
           privacy policy
         </Link>
         .

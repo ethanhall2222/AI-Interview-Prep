@@ -19,7 +19,7 @@ function resolveSupabaseEnv() {
   return { url, anonKey };
 }
 
-export function getSupabaseServerComponentClient<Database = Record<string, never>>() {
+export function getSupabaseServerComponentClient<Database = any>() {
   const { url, anonKey } = resolveSupabaseEnv();
   return createServerComponentClient<Database>(
     { cookies },
@@ -30,7 +30,7 @@ export function getSupabaseServerComponentClient<Database = Record<string, never
   );
 }
 
-export function getSupabaseRouteHandlerClient<Database = Record<string, never>>() {
+export function getSupabaseRouteHandlerClient<Database = any>() {
   const { url, anonKey } = resolveSupabaseEnv();
   return createRouteHandlerClient<Database>(
     { cookies },
@@ -41,5 +41,4 @@ export function getSupabaseRouteHandlerClient<Database = Record<string, never>>(
   );
 }
 
-export type TypedSupabaseClient<Database = Record<string, never>> =
-  SupabaseClient<Database>;
+export type TypedSupabaseClient<Database = any> = SupabaseClient<Database>;

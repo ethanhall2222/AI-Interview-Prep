@@ -27,7 +27,7 @@ export function QuestionCard({
   return (
     <article className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-6 shadow">
       <header className="space-y-1">
-        <p className="text-xs font-semibold uppercase tracking-wide text-indigo-300">
+        <p className="text-xs font-semibold uppercase tracking-wide text-[#f2c04b]">
           Question {index + 1}
         </p>
         <h3 className="text-base font-medium text-slate-50">{question}</h3>
@@ -42,7 +42,7 @@ export function QuestionCard({
           placeholder="Speak and refine using STAR: Situation, Task, Action, Result."
           className={cn(
             "min-h-[160px] w-full resize-y rounded-xl border bg-slate-950/60 p-4 text-sm text-slate-100 shadow-inner transition",
-            "border-slate-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40",
+            "border-slate-800 focus:border-[#eaaa00] focus:outline-none focus:ring-2 focus:ring-[#eaaa00]/35",
             disabled && "cursor-not-allowed opacity-70",
           )}
           maxLength={MAX_LENGTH}

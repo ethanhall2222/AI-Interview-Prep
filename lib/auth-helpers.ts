@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import type { Session } from "@supabase/auth-helpers-nextjs";
 import type { TypedSupabaseClient } from "./supabase-server";
 import {
   getSupabaseRouteHandlerClient,
@@ -26,87 +25,141 @@ function hasSupabaseEnv() {
   );
 }
 
+function isDevModeBypass() {
+  return (
+    process.env.NEXT_PUBLIC_DEV_MODE === "1" ||
+    process.env.NODE_ENV !== "production"
+  );
+}
+
 function stubSession() {
   return {
-    session: null as Session | null,
+    session: null as AppSession | null,
     supabase: null as unknown as TypedSupabaseClient,
   };
 }
 
-export async function requireServerSession() {
-  if (!hasSupabaseEnv()) {
-    // Allow unauthenticated access in dev mode when Supabase isn't configured yet.
-    if (process.env.NEXT_PUBLIC_DEV_MODE === "1") {
-      return stubSession();
-    }
+type AppSession = {
+  user: {
+    id: string;
+    email: string | null;
+  };
+};
 
-    throw new Error(
-      "Supabase environment variables NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must be set.",
-    );
+function parseAdminEmails() {
+  const raw = process.env.ADMIN_EMAILS ?? "";
+  return raw
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export function isAdminEmail(email?: string | null) {
+  if (!email) {
+    return false;
+  }
+  return parseAdminEmails().includes(email.toLowerCase());
+}
+
+export async function requireServerSession() {
+  if (isDevModeBypass() || !hasSupabaseEnv()) {
+    return stubSession();
   }
 
   const supabase = getSupabaseServerComponentClient();
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (error || !user) {
     redirect("/login");
   }
 
-  await ensureProfileRecord(supabase, session.user.id);
+  const session: AppSession = {
+    user: {
+      id: user.id,
+      email: user.email ?? null,
+    },
+  };
 
-  return { session, supabase } as { session: Session; supabase: TypedSupabaseClient };
+  await ensureProfileRecord(supabase, user.id);
+
+  return { session, supabase } as { session: AppSession; supabase: TypedSupabaseClient };
 }
 
 export async function getOptionalServerSession() {
-  if (!hasSupabaseEnv()) {
-    if (process.env.NEXT_PUBLIC_DEV_MODE === "1") {
-      return stubSession();
-    }
-
-    throw new Error(
-      "Supabase environment variables NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must be set.",
-    );
+  if (isDevModeBypass() || !hasSupabaseEnv()) {
+    return stubSession();
   }
 
   const supabase = getSupabaseServerComponentClient();
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
 
-  if (session) {
-    await ensureProfileRecord(supabase, session.user.id);
+  if (!error && user) {
+    await ensureProfileRecord(supabase, user.id);
   }
 
+  const session: AppSession | null =
+    !error && user
+      ? {
+          user: {
+            id: user.id,
+            email: user.email ?? null,
+          },
+        }
+      : null;
+
   return { session: session ?? null, supabase } as {
-    session: Session | null;
+    session: AppSession | null;
     supabase: TypedSupabaseClient;
   };
 }
 
 export async function getRouteHandlerSession() {
-  if (!hasSupabaseEnv()) {
-    if (process.env.NEXT_PUBLIC_DEV_MODE === "1") {
-      return stubSession();
-    }
-
-    throw new Error(
-      "Supabase environment variables NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must be set.",
-    );
+  if (isDevModeBypass() || !hasSupabaseEnv()) {
+    return stubSession();
   }
 
   const supabase = getSupabaseRouteHandlerClient();
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
 
-  if (session) {
-    await ensureProfileRecord(supabase, session.user.id);
+  if (!error && user) {
+    await ensureProfileRecord(supabase, user.id);
   }
 
+  const session: AppSession | null =
+    !error && user
+      ? {
+          user: {
+            id: user.id,
+            email: user.email ?? null,
+          },
+        }
+      : null;
+
   return { session: session ?? null, supabase } as {
-    session: Session | null;
+    session: AppSession | null;
     supabase: TypedSupabaseClient;
   };
+}
+
+export async function requireAdminSession() {
+  const { session, supabase } = await requireServerSession();
+
+  if (!session) {
+    redirect("/admin/login");
+  }
+
+  if (!isAdminEmail(session.user.email)) {
+    redirect("/dashboard");
+  }
+
+  return { session, supabase } as { session: AppSession; supabase: TypedSupabaseClient };
 }

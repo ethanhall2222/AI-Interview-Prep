@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   CheckCircle2,
@@ -16,6 +17,7 @@ import { Button, buttonStyles } from "@/components/Button";
 import QuestionCard from "@/components/QuestionCard";
 import ScoreCard from "@/components/ScoreCard";
 import { useToast } from "@/components/ToastProvider";
+import WorkflowRail from "@/components/WorkflowRail";
 import { interviewTypes } from "@/lib/schemas";
 import type {
   BodyFeedbackType,
@@ -33,9 +35,15 @@ interface QuestionResponsePayload extends QuestionResponseType {
   message?: string;
 }
 
+interface EvalResponsePayload extends StoredEvaluationType {
+  sessionId?: string;
+  message?: string;
+}
+
 type BodyFeedbackEntry = BodyFeedbackType | null;
 
 export default function PracticeClient({ roles }: PracticeClientProps) {
+  const router = useRouter();
   const defaultRole = roles[0] ?? "";
   const [roleInput, setRoleInput] = useState<string>(defaultRole);
   const [interviewType, setInterviewType] = useState<InterviewType>(interviewTypes[0]);
@@ -50,8 +58,14 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
   const [analyzingIndex, setAnalyzingIndex] = useState<number | null>(null);
   const [playingIndex, setPlayingIndex] = useState<number | null>(null);
   const [recorderSupported, setRecorderSupported] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [mode, setMode] = useState<"voice" | "type">("type");
+  const [micPermission, setMicPermission] = useState<
+    "granted" | "denied" | "prompt" | "unknown"
+  >("unknown");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [reviewMode, setReviewMode] = useState(false);
+  const [latestSessionId, setLatestSessionId] = useState<string | null>(null);
   const [bodyFeedbacks, setBodyFeedbacks] = useState<BodyFeedbackEntry[]>([]);
   const [videoPreviews, setVideoPreviews] = useState<(string | null)[]>([]);
 
@@ -88,11 +102,38 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
       return;
     }
 
-    const supported = !!(
+    const mediaSupported = !!(
       navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === "function"
     );
+    const speechApiSupported = Boolean(
+      "SpeechRecognition" in window || "webkitSpeechRecognition" in window,
+    );
 
-    setRecorderSupported(supported);
+    setRecorderSupported(mediaSupported);
+    setSpeechSupported(speechApiSupported);
+    if (mediaSupported && speechApiSupported) {
+      setMode("voice");
+    } else {
+      setMode("type");
+    }
+
+    const checkPermission = async () => {
+      try {
+        if (!navigator.permissions?.query) {
+          setMicPermission("unknown");
+          return;
+        }
+        const status = await navigator.permissions.query({
+          name: "microphone" as PermissionName,
+        });
+        setMicPermission(status.state);
+        status.onchange = () => setMicPermission(status.state);
+      } catch {
+        setMicPermission("unknown");
+      }
+    };
+
+    void checkPermission();
 
     return () => {
       mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -114,6 +155,7 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
 
     setLoadingQuestions(true);
     setEvaluation(null);
+    setLatestSessionId(null);
     setReviewMode(false);
     setCurrentIndex(0);
     videoPreviews.forEach((url) => {
@@ -183,11 +225,12 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
       if (!response.ok || !payload.text) {
         throw new Error(payload.message ?? "Transcription failed.");
       }
+      const transcript = payload.text;
 
       setAnswers((current) => {
         const next = [...current];
         const existing = next[index]?.trim();
-        next[index] = existing ? `${existing}\n${payload.text}` : payload.text;
+        next[index] = existing ? `${existing}\n${transcript}` : transcript;
         return next;
       });
 
@@ -251,8 +294,13 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
 
   const startRecording = async (index: number) => {
     try {
-      if (!recorderSupported) {
-        publish("Microphone access is not supported in this browser.", "error");
+      if (mode !== "voice") {
+        publish("Switch to Voice mode to record audio.", "error");
+        return;
+      }
+
+      if (!recorderSupported || !speechSupported) {
+        publish("Voice mode is not supported in this browser.", "error");
         return;
       }
 
@@ -264,6 +312,7 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
         audio: true,
         video: { facingMode: "user" },
       });
+      setMicPermission("granted");
       mediaStreamRef.current = stream;
 
       const recorder = new MediaRecorder(stream);
@@ -301,6 +350,7 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
       setRecordingIndex(index);
       publish("Recording started. Speak your answer out loud.", "info");
     } catch (error) {
+      setMicPermission("denied");
       publish(
         error instanceof Error ? error.message : "Unable to access microphone.",
         "error",
@@ -324,7 +374,7 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
     });
   };
 
-  const microphoneUnavailable = !recorderSupported;
+  const voiceUnavailable = !recorderSupported || !speechSupported;
   const quickTips = [
     "Aim for 60-90 seconds per answer and keep STAR in mind.",
     "Lead with the Result, then rewind through Situation → Task → Action.",
@@ -444,16 +494,30 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
         }),
       });
 
-      const payload = (await response.json()) as StoredEvaluationType & {
-        message?: string;
-      };
+      const payload = (await response.json()) as EvalResponsePayload;
 
       if (!response.ok) {
         throw new Error(payload.message ?? "Evaluation failed. Try again.");
       }
 
-      setEvaluation(payload);
-      publish("Feedback ready! Review your scores below.", "success");
+      const { sessionId } = payload;
+      const evaluationPayload: StoredEvaluationType = {
+        scores: payload.scores,
+        feedback: payload.feedback,
+        tips_next_time: payload.tips_next_time,
+        meta: payload.meta,
+      };
+      setEvaluation(evaluationPayload);
+      setLatestSessionId(sessionId ?? null);
+
+      if (sessionId) {
+        publish("Feedback ready. Opening your dashboard.", "success");
+        setTimeout(() => {
+          router.push(`/dashboard?latest=${sessionId}`);
+        }, 600);
+      } else {
+        publish("Feedback ready! Review your scores below.", "success");
+      }
     } catch (error) {
       publish(
         error instanceof Error ? error.message : "Unable to fetch feedback.",
@@ -466,6 +530,7 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
 
   const handleReset = () => {
     setEvaluation(null);
+    setLatestSessionId(null);
     setQuestions([]);
     setAnswers([]);
     bodyFeedbacks.forEach((entry, idx) => {
@@ -482,9 +547,10 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
 
   return (
     <div className="space-y-10">
+      <WorkflowRail current="practice" />
       <header className="grid gap-6 rounded-3xl border border-slate-800/60 bg-slate-900/60 p-6 backdrop-blur md:grid-cols-[1.35fr_1fr]">
         <div className="space-y-4">
-          <p className="inline-flex items-center gap-2 rounded-full border border-indigo-500/40 bg-indigo-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-indigo-200">
+          <p className="inline-flex items-center gap-2 rounded-full border border-[#eaaa00]/40 bg-[#eaaa00]/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#ffe39f]">
             <Headphones className="h-3.5 w-3.5" /> Voice-led drills
           </p>
           <h1 className="text-3xl font-semibold text-slate-50 sm:text-4xl">
@@ -504,7 +570,7 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
                   value={roleInput}
                   onChange={(event) => setRoleInput(event.target.value)}
                   placeholder="e.g. Engineering Manager"
-                  className="w-64 rounded-md border border-slate-700/70 bg-slate-950/80 px-3 py-2 text-sm text-white shadow-inner focus:border-blue-400 focus:outline-none"
+                  className="w-64 rounded-md border border-slate-700/70 bg-slate-950/80 px-3 py-2 text-sm text-white shadow-inner focus:border-[#eaaa00] focus:outline-none"
                 />
                 <datalist id="role-suggestions">
                   {roles.map((role) => (
@@ -521,7 +587,7 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
                   onClick={() => setInterviewType(option.id)}
                   className={`rounded-full px-3 py-1 transition ${
                     interviewType === option.id
-                      ? "bg-blue-500/20 text-blue-200"
+                      ? "bg-[#eaaa00]/20 text-[#ffe39f]"
                       : "hover:bg-slate-800/70"
                   }`}
                 >
@@ -540,7 +606,7 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
                 max={5}
                 value={questionCount}
                 onChange={(event) => setQuestionCount(Number(event.target.value))}
-                className="accent-blue-500"
+                className="accent-[#eaaa00]"
               />
               <span className="w-6 text-right text-xs text-slate-300">
                 {questionCount}
@@ -563,20 +629,55 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
         </div>
         <aside className="space-y-3 rounded-2xl border border-slate-800/50 bg-slate-950/60 p-5">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-200">
-            <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Quick tips
+            <CheckCircle2 className="h-4 w-4 text-[#eaaa00]" /> Quick tips
           </h2>
           <ul className="space-y-3 text-xs leading-relaxed text-slate-400">
             {quickTips.map((tip) => (
               <li key={tip} className="flex items-start gap-2">
-                <ArrowRight className="mt-0.5 h-3 w-3 text-indigo-400" />
+                <ArrowRight className="mt-0.5 h-3 w-3 text-[#eaaa00]" />
                 <span>{tip}</span>
               </li>
             ))}
           </ul>
-          {microphoneUnavailable && (
-            <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-              Browser does not expose microphone access. Type your responses manually or
-              switch browsers to use speech capture.
+          <div className="space-y-2 rounded-md border border-slate-800/70 bg-slate-950/60 p-3">
+            <p className="text-[11px] uppercase tracking-wide text-slate-500">Input mode</p>
+            <div className="flex items-center gap-1 rounded-full border border-slate-700/60 bg-slate-950/60 px-1 py-1 text-xs font-medium text-slate-300">
+              <button
+                type="button"
+                onClick={() => setMode("voice")}
+                disabled={voiceUnavailable}
+                className={`rounded-full px-3 py-1 transition ${
+                  mode === "voice"
+                    ? "bg-[#eaaa00]/20 text-[#ffe39f]"
+                    : "hover:bg-slate-800/70"
+                } ${voiceUnavailable ? "cursor-not-allowed opacity-50" : ""}`}
+              >
+                Voice mode
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("type")}
+                className={`rounded-full px-3 py-1 transition ${
+                  mode === "type" ? "bg-slate-800 text-slate-100" : "hover:bg-slate-800/70"
+                }`}
+              >
+                Type mode
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-400">
+              Permission: <span className="text-slate-300">{micPermission}</span>
+            </p>
+            {mode === "voice" && (
+              <p className="text-[11px] text-slate-400">
+                If mic fails: browser settings -&gt; site permissions -&gt; allow microphone,
+                then reload.
+              </p>
+            )}
+          </div>
+          {voiceUnavailable && (
+            <p className="rounded-md border border-[#eaaa00]/40 bg-[#eaaa00]/10 px-3 py-2 text-xs text-[#ffe39f]">
+              Voice mode is unavailable here because microphone capture or speech APIs
+              are missing. We switched you to Type mode automatically.
             </p>
           )}
         </aside>
@@ -637,7 +738,9 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
                 size="sm"
                 onClick={() => toggleRecording(currentIndex)}
                 disabled={
+                  mode !== "voice" ||
                   !recorderSupported ||
+                  !speechSupported ||
                   submitting ||
                   transcribingIndex === currentIndex ||
                   analyzingIndex === currentIndex
@@ -676,8 +779,8 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
               ) : (
                 <span>
                   {recorderSupported
-                    ? "Use the microphone, then refine the transcript inline."
-                    : "Voice capture is not supported in this browser."}
+                  ? "Use the microphone, then refine the transcript inline."
+                    : "Type mode is active. You can still complete the entire flow."}
                 </span>
               )}
             </div>
@@ -773,7 +876,7 @@ export default function PracticeClient({ roles }: PracticeClientProps) {
         </Button>
         {evaluation && (
           <Link
-            href="/dashboard"
+            href={latestSessionId ? `/dashboard?latest=${latestSessionId}` : "/dashboard"}
             className={buttonStyles({ intent: "secondary", size: "md" })}
           >
             Save &amp; view dashboard
