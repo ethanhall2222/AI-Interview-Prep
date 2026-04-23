@@ -114,6 +114,11 @@ export default async function AdminJobsReviewPage() {
       )}
 
       <div className="text-xs text-slate-400">
+        Continuous build roles live in{" "}
+        <Link href="/admin/agents" className="text-[#f4d27d] hover:text-[#ffe49a]">
+          /admin/agents
+        </Link>
+        .{" "}
         Need a dedicated admin magic link? Use{" "}
         <Link href="/admin/login" className="text-[#f4d27d] hover:text-[#ffe49a]">
           /admin/login

@@ -40,3 +40,11 @@ Talk track:
 
 Talk track:
 - "This closes the loop with a lightweight, fast tracker for application momentum."
+
+## Admin Extension
+1. Open `/admin/agents` as an admin.
+2. Show the continuous build lanes: Discover, Shape, Build, Verify, Launch, Learn.
+3. Use the reusable build prompt to start the next product iteration.
+
+Talk track:
+- "The product now has an agency-style operating model so future work has clear roles, handoffs, and release gates."

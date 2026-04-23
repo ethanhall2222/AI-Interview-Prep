@@ -12,6 +12,7 @@
 
 # testing
 /coverage
+docs/agent_readiness.md
 
 # next.js
 /.next/

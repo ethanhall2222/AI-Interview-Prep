@@ -1,0 +1,79 @@
+name: Agency Continuous Build
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */6 * * *"
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  agent-readiness:
+    name: Agent readiness gates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run agency continuous build
+        id: agents
+        run: pnpm agents:build
+        env:
+          NEXT_PUBLIC_DEV_MODE: "1"
+
+      - name: Upload readiness report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-readiness-report
+          path: docs/agent_readiness.md
+
+      - name: Ensure readiness label
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create agent-readiness --color 0E8A16 --description "Agency continuous build readiness" || true
+
+      - name: Close stale readiness issues
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue list --state open --label agent-readiness --json number --jq '.[].number' \
+            | while read -r issue; do
+                gh issue close "$issue" --comment "Agency readiness gates are passing on $GITHUB_SHA."
+              done
+
+      - name: Open readiness issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Agent readiness gates need work"
+          existing="$(gh issue list --state open --label agent-readiness --json number --jq '.[0].number')"
+          body="$(cat docs/agent_readiness.md)"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title "$title" --label agent-readiness --body "$body"
+          fi

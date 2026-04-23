@@ -47,6 +47,7 @@ export default async function RootLayout({
     navLinks.push({ href: "/jobs/portal", label: "Job portal" });
     if (isAdminEmail(session.user.email)) {
       navLinks.push({ href: "/admin/jobs", label: "Admin" });
+      navLinks.push({ href: "/admin/agents", label: "Agents" });
     }
   }
 
