@@ -50,7 +50,7 @@ jobs:
 
       - name: Commit verified improvement
         run: |
-          if git diff --quiet; then
+          if [ -z "$(git status --porcelain)" ]; then
             echo "No improvement changes to commit."
             exit 0
           fi
